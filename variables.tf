@@ -13,3 +13,26 @@ variable "output_bucket_name" {
   description = "Nombre del bucket de salida para reportes"
   type        = string
 }
+
+
+variable "db_cluster_identifier" {
+  default     = "reportes-db-cluster"
+  description = "Identificador del clúster Aurora"
+}
+
+variable "db_name" {
+  default     = "reportes_db"
+}
+
+variable "db_username" {
+  default     = "admin"
+}
+
+variable "db_password" {
+  default     = "root"
+  sensitive   = true
+}
+
+variable "db_instance_class" {
+  default     = "db.t3.medium"
+}
