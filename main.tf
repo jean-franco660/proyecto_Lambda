@@ -5,7 +5,7 @@ provider "aws" {
 # 🧩 Empaquetar Lambda desde la raíz del submódulo
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/../src"               # carpeta raíz del proyecto_lambda
+  source_dir  = "${path.module}/src"               # carpeta raíz del proyecto_lambda
   output_path = "${path.module}/../function.zip"
 }
 
@@ -42,6 +42,7 @@ resource "aws_lambda_function" "my_lambda" {
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+
 
   environment {
     variables = {
