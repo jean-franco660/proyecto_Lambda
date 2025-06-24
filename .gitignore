@@ -1,2 +1,17 @@
-venv
+# 👇 Evita subir entornos virtuales
+.venv/
+venv/
+
+# 👇 Archivos Python compilados
+__pycache__/
+*.pyc
+*.pyo
+
+# 👇 Terraform local state files
 terraform.tfvars
+
+# 👇 Archivos de sistema
+.DS_Store
+
+# 👇 Archivos de logs temporales
+*.log
