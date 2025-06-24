@@ -1,72 +1,61 @@
-import json
 import boto3
-import pandas as pd
-import io
-import matplotlib.pyplot as plt
-import base64
-import uuid
-
-s3 = boto3.client('s3')
-
-def generate_base64_plot(fig):
-    buffer = io.BytesIO()
-    fig.savefig(buffer, format='png')
-    buffer.seek(0)
-    img_b64 = base64.b64encode(buffer.read()).decode('utf-8')
-    plt.close(fig)
-    return img_b64
+import csv
+import json
+import os
 
 def lambda_handler(event, context):
+    # Inicializar cliente S3
+    s3 = boto3.client('s3')
+
+    # Obtener información del archivo cargado
+    input_bucket = event['Records'][0]['s3']['bucket']['name']
+    file_key     = event['Records'][0]['s3']['object']['key']
+    output_bucket = os.environ['OUTPUT_BUCKET_NAME']
+
+    print(f"Procesando archivo: {file_key} del bucket: {input_bucket}")
+
+    # Descargar el archivo CSV
     try:
-        # Leer evento del archivo CSV subido
-        bucket_name = event['Records'][0]['s3']['bucket']['name']
-        key = event['Records'][0]['s3']['object']['key']
+        response = s3.get_object(Bucket=input_bucket, Key=file_key)
+        content = response['Body'].read().decode('utf-8').splitlines()
+        reader = csv.DictReader(content)
+    except Exception as e:
+        print(f"Error al leer el archivo: {e}")
+        raise
 
-        # Leer CSV desde S3
-        response = s3.get_object(Bucket=bucket_name, Key=key)
-        content = response['Body'].read().decode('utf-8')
-        df = pd.read_csv(io.StringIO(content))
+    # Procesar contenido del CSV
+    total_rows = 0
+    columnas = []
 
-        # Procesamiento simple
-        df.dropna(subset=['QUANTITYORDERED', 'PRICEEACH', 'STATUS'], inplace=True)
-        df['TOTAL'] = df['QUANTITYORDERED'] * df['PRICEEACH']
+    for row in reader:
+        total_rows += 1
+        if not columnas:
+            columnas = list(row.keys())
 
-        # Estadísticas resumen
-        resumen = {
-            "total_ventas": float(df['TOTAL'].sum()),
-            "ventas_por_estado": df.groupby('STATUS')['TOTAL'].sum().round(2).to_dict()
-        }
+    # Generar reporte
+    reporte = {
+        "archivo_original": file_key,
+        "total_filas": total_rows,
+        "columnas": columnas
+    }
 
-        # Gráfico de barras por estado
-        fig, ax = plt.subplots()
-        df.groupby('STATUS')['TOTAL'].sum().plot(kind='bar', ax=ax)
-        ax.set_title("Ventas por Estado")
-        img_base64 = generate_base64_plot(fig)
+    # Nombre del archivo de salida
+    report_key = f"reporte_{file_key.replace('.csv', '.json')}"
 
-        # Armar reporte final
-        reporte = {
-            "id": str(uuid.uuid4()),
-            "archivo_fuente": key,
-            "resumen": resumen,
-            "grafico_base64": img_base64
-        }
-
-        # Guardar reporte en S3
-        report_key = f"reports/{key.replace('.csv', '')}_report.json"
+    # Subir el reporte al bucket de salida
+    try:
         s3.put_object(
-            Bucket=bucket_name,
+            Bucket=output_bucket,
             Key=report_key,
-            Body=json.dumps(reporte),
+            Body=json.dumps(reporte, indent=4).encode('utf-8'),
             ContentType='application/json'
         )
-
-        return {
-            "statusCode": 200,
-            "body": f"Reporte generado en: {report_key}"
-        }
-
+        print(f"Reporte subido a {output_bucket}/{report_key}")
     except Exception as e:
-        return {
-            "statusCode": 500,
-            "body": str(e)
-        }
+        print(f"Error al subir el reporte: {e}")
+        raise
+
+    return {
+        'statusCode': 200,
+        'body': f"Reporte generado: {report_key}"
+    }

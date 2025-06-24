@@ -1,2 +1,3 @@
-aws_region            = "us-east-1"
-bucket_name           = "proyecto-cloud-bucket-unico-2025"
+input_bucket_name  = "proyecto-csv-entrada-2025"
+output_bucket_name = "proyecto-reportes-procesados"
+aws_region         = "us-east-1"

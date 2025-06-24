@@ -7,11 +7,12 @@ __pycache__/
 *.pyc
 *.pyo
 
-# 👇 Terraform local state files
-terraform.tfvars
-
 # 👇 Archivos de sistema
 .DS_Store
 
 # 👇 Archivos de logs temporales
 *.log
+
+# Entornos virtuales
+.venv/
+env/
