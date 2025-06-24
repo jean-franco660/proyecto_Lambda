@@ -4,6 +4,7 @@ import json
 import os
 import io
 import matplotlib.pyplot as plt
+import statistics
 
 def analizar_csv(content_lines):
     reader = csv.DictReader(content_lines)
@@ -19,16 +20,27 @@ def analizar_csv(content_lines):
             try:
                 valor = float(row[col])
                 valores.append(valor)
-                break
+                break  # usar solo primera columna numérica válida
             except:
                 continue
     return columnas, total, valores
 
-def generar_reporte_json(nombre_archivo, columnas, total_filas):
+def calcular_estadisticas(valores):
+    if not valores:
+        return {}
+    return {
+        "conteo": len(valores),
+        "min": min(valores),
+        "max": max(valores),
+        "promedio": statistics.mean(valores)
+    }
+
+def generar_reporte_json(nombre_archivo, columnas, total_filas, estadisticas):
     return {
         "archivo": nombre_archivo,
         "total_filas": total_filas,
-        "columnas": columnas
+        "columnas_detectadas": columnas,
+        "estadisticas": estadisticas
     }
 
 def generar_grafico(valores):
@@ -49,22 +61,21 @@ def lambda_handler(event, context):
     file_key = event['Records'][0]['s3']['object']['key']
     output_bucket = os.environ['OUTPUT_BUCKET_NAME']
 
-    print(f"📥 Procesando archivo: {file_key} desde bucket: {input_bucket}")
+    print(f"Procesando archivo: {file_key} desde bucket: {input_bucket}")
 
-    # Leer CSV desde S3
     try:
         response = s3.get_object(Bucket=input_bucket, Key=file_key)
         content = response['Body'].read().decode('utf-8').splitlines()
     except Exception as e:
-        print(f"❌ Error al leer el archivo: {e}")
+        print(f"Error al leer el archivo: {e}")
         raise
 
-    # Procesar CSV
     columnas, total_rows, valores_numericos = analizar_csv(content)
+    estadisticas = calcular_estadisticas(valores_numericos)
 
-    # Generar y subir reporte JSON
+    # Generar y subir JSON
     report_key = f"reporte_{file_key.replace('.csv', '.json')}"
-    reporte = generar_reporte_json(file_key, columnas, total_rows)
+    reporte = generar_reporte_json(file_key, columnas, total_rows, estadisticas)
 
     try:
         s3.put_object(
@@ -73,12 +84,12 @@ def lambda_handler(event, context):
             Body=json.dumps(reporte, indent=4).encode('utf-8'),
             ContentType='application/json'
         )
-        print(f"✅ Reporte JSON subido a {output_bucket}/{report_key}")
+        print(f"Reporte JSON subido a {output_bucket}/{report_key}")
     except Exception as e:
-        print(f"❌ Error al subir el reporte: {e}")
+        print(f"Error al subir el reporte: {e}")
         raise
 
-    # Generar y subir gráfico si hay datos numéricos
+    # Generar y subir gráfico si hay datos
     if valores_numericos:
         try:
             grafico = generar_grafico(valores_numericos)
@@ -89,15 +100,15 @@ def lambda_handler(event, context):
                 Body=grafico,
                 ContentType='image/png'
             )
-            print(f"📊 Gráfico subido a {output_bucket}/{graph_key}")
+            print(f"Gráfico subido a {output_bucket}/{graph_key}")
         except Exception as e:
-            print(f"❌ Error al generar o subir gráfico: {e}")
+            print(f"Error al generar o subir gráfico: {e}")
             graph_key = "No disponible"
     else:
-        print("⚠️ No se encontraron columnas numéricas para graficar.")
+        print("No se encontraron columnas numéricas para graficar.")
         graph_key = "No disponible"
 
     return {
         'statusCode': 200,
-        'body': f"✅ Reporte generado: {report_key}, Gráfico: {graph_key}"
+        'body': f"Reporte generado: {report_key}, Gráfico: {graph_key}"
     }
