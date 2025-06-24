@@ -11,7 +11,7 @@ data "archive_file" "lambda_zip" {
 
 # Rol de ejecución para Lambda
 resource "aws_iam_role" "lambda_exec_role" {
-  name = "lambda_exec_role_jf_2025"
+  name = "lambda_exec_role_cloud_2025"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
