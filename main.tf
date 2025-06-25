@@ -98,6 +98,12 @@ resource "aws_lambda_permission" "allow_s3_invoke" {
   source_arn = "arn:aws:s3:::${var.input_bucket_name}"
 }
 
+output "lambda_arn" {
+  description = "ARN de la función Lambda para ser usada por S3"
+  value       = aws_lambda_function.my_lambda.arn
+}
+
+
 # 🧾 Tabla DynamoDB para historial de reportes
 resource "aws_dynamodb_table" "reportes" {
   name           = "historial_reportes"
