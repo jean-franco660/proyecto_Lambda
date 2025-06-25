@@ -3,6 +3,7 @@ import csv
 import json
 import os
 import io
+import time
 import matplotlib.pyplot as plt
 import statistics
 
@@ -73,7 +74,6 @@ def lambda_handler(event, context):
     columnas, total_rows, valores_numericos = analizar_csv(content)
     estadisticas = calcular_estadisticas(valores_numericos)
 
-    # Generar y subir JSON
     report_key = f"reporte_{file_key.replace('.csv', '.json')}"
     reporte = generar_reporte_json(file_key, columnas, total_rows, estadisticas)
 
@@ -89,7 +89,6 @@ def lambda_handler(event, context):
         print(f"Error al subir el reporte: {e}")
         raise
 
-    # Generar y subir gráfico si hay datos
     if valores_numericos:
         try:
             grafico = generar_grafico(valores_numericos)
@@ -107,6 +106,24 @@ def lambda_handler(event, context):
     else:
         print("No se encontraron columnas numéricas para graficar.")
         graph_key = "No disponible"
+
+    # 🔄 Guardar historial en DynamoDB
+    try:
+        dynamodb = boto3.resource('dynamodb')
+        table = dynamodb.Table('historial_reportes')
+        table.put_item(
+            Item={
+                'reporte_id': report_key,
+                'archivo': file_key,
+                'timestamp': int(time.time()),
+                'filas': total_rows,
+                'columnas': columnas,
+                'grafico': graph_key
+            }
+        )
+        print(f"Historial guardado en DynamoDB para {report_key}")
+    except Exception as e:
+        print(f"Error al guardar historial en DynamoDB: {e}")
 
     return {
         'statusCode': 200,
