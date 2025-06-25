@@ -68,6 +68,11 @@ resource "aws_iam_role_policy" "lambda_policy" {
 # 🧠 Función Lambda
 resource "aws_lambda_function" "my_lambda" {
   function_name = "proyecto_lambda_reportes_${var.env}"
+  
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [filename, source_code_hash]
+  }
   description   = "Procesa CSV y genera reporte JSON"
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "main.lambda_handler"
@@ -107,6 +112,12 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 
 resource "aws_dynamodb_table" "reportes" {
   name           = "historial_reportes"
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = []
+  }
+  
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "reporte_id"
 
