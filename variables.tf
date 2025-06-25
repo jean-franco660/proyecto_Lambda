@@ -36,3 +36,9 @@ variable "db_password" {
 variable "db_instance_class" {
   default     = "db.t3.medium"
 }
+
+variable "env" {
+  description = "Nombre del entorno (por ejemplo: dev, prod, test)"
+  type        = string
+  default     = "dev"
+}
