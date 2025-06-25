@@ -104,3 +104,18 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 
   depends_on = [aws_lambda_permission.allow_s3_invoke]
 }
+
+resource "aws_dynamodb_table" "reportes" {
+  name           = "historial_reportes"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "reporte_id"
+
+  attribute {
+    name = "reporte_id"
+    type = "S"
+  }
+
+  tags = {
+    Environment = "dev"
+  }
+}
