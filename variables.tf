@@ -14,18 +14,6 @@ variable "output_bucket_name" {
   type        = string
 }
 
-variable "aws_secret_key" {
-  description = "Clave secreta AWS"
-  type        = string
-  sensitive   = true
-}
-
-variable "aws_access_key" {
-  description = "Clave de acceso AWS"
-  type        = string
-  sensitive   = true
-}
-
 variable "env" {
   description = "Nombre del entorno (por ejemplo: dev, prod, test)"
   type        = string
