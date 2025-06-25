@@ -6,12 +6,12 @@ provider "aws" {
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/src"
-  output_path = "${path.module}/../function.zip"
+  output_path = "${path.module}/../function_${var.env}.zip"
 }
 
 # 🎯 Crear el rol de ejecución para Lambda
 resource "aws_iam_role" "lambda_exec_role" {
-  name = "lambda_exec_role_cloud_2025"
+  name = "lambda_exec_role_cloud_2025_${var.env}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -28,7 +28,7 @@ resource "aws_iam_role" "lambda_exec_role" {
 
 # 🔐 Permisos: logs + acceso a ambos buckets
 resource "aws_iam_role_policy" "lambda_policy" {
-  name = "lambda_s3_policy"
+  name = "lambda_s3_policy_${var.env}"
   role = aws_iam_role.lambda_exec_role.id
 
   policy = jsonencode({
@@ -59,7 +59,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
 
 # 🧠 Función Lambda
 resource "aws_lambda_function" "my_lambda" {
-  function_name = "proyecto_lambda_reportes"
+  function_name = "proyecto_lambda_reportes_${var.env}"
   description   = "Procesa CSV y genera reporte JSON"
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "main.lambda_handler"
@@ -70,7 +70,7 @@ resource "aws_lambda_function" "my_lambda" {
 
   environment {
     variables = {
-      ENV                = "dev"
+      ENV                = var.env
       OUTPUT_BUCKET_NAME = var.output_bucket_name
     }
   }
