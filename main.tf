@@ -1,16 +1,15 @@
 provider "aws" {
-  region     = var.aws_region
+  region = var.aws_region
 }
 
-
-# 🧩 Empaquetar Lambda automáticamente
+# 🧩 Empaquetar código
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/src"
-  output_path = "${path.module}/../function.zip"
+  output_path = "${path.module}/function.zip"
 }
 
-# 🎯 Crear el rol de ejecución para Lambda
+# 🔐 Rol de ejecución
 resource "aws_iam_role" "lambda_exec_role" {
   name = "lambda_exec_role_cloud_2025"
 
@@ -27,7 +26,7 @@ resource "aws_iam_role" "lambda_exec_role" {
   })
 }
 
-# 🔐 Permisos: logs + acceso a ambos buckets
+# 📜 Políticas IAM
 resource "aws_iam_role_policy" "lambda_policy" {
   name = "lambda_s3_policy"
   role = aws_iam_role.lambda_exec_role.id
@@ -65,15 +64,10 @@ resource "aws_iam_role_policy" "lambda_policy" {
   depends_on = [aws_dynamodb_table.reportes]
 }
 
-
 # 🧠 Función Lambda
 resource "aws_lambda_function" "my_lambda" {
   function_name = "proyecto_lambda_reportes"
   
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [filename, source_code_hash]
-  }
   description   = "Procesa CSV y genera reporte JSON"
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "main.lambda_handler"
@@ -87,9 +81,14 @@ resource "aws_lambda_function" "my_lambda" {
       OUTPUT_BUCKET_NAME = var.output_bucket_name
     }
   }
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [filename, source_code_hash]
+  }
 }
 
-# 🔔 Permitir invocación desde S3
+# 🔔 Permiso de invocación desde S3
 resource "aws_lambda_permission" "allow_s3_invoke" {
   statement_id  = "AllowExecutionFromS3"
   action        = "lambda:InvokeFunction"
@@ -98,25 +97,30 @@ resource "aws_lambda_permission" "allow_s3_invoke" {
   source_arn    = "arn:aws:s3:::${var.input_bucket_name}"
 }
 
-# ✅ Output definido correctamente fuera del recurso
-output "lambda_function_arn" {
-  value = aws_lambda_function.my_lambda.arn
+# 🔔 Notificación desde S3
+resource "aws_s3_bucket_notification" "s3_to_lambda" {
+  bucket = var.input_bucket_name
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.my_lambda.arn
+    events              = ["s3:ObjectCreated:*"]
+  }
+
+  depends_on = [aws_lambda_permission.allow_s3_invoke]
 }
 
-# 🧾 Tabla DynamoDB para historial de reportes
+# 🧾 Tabla DynamoDB
 resource "aws_dynamodb_table" "reportes" {
-  name           = "historial_reportes"
-
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes  = []
-  }
-  
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "reporte_id"
+  name         = "historial_reportes"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "reporte_id"
 
   attribute {
     name = "reporte_id"
     type = "S"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
