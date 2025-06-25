@@ -53,8 +53,15 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Action = ["s3:PutObject"],
         Resource = "arn:aws:s3:::${var.output_bucket_name}/*"
       }
+      {
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Scan"]
+        Resource = aws_dynamodb_table.reportes.arn
+      }
     ]
   })
+  
+  depends_on = [aws_dynamodb_table.reportes]
 }
 
 # 🧠 Función Lambda
