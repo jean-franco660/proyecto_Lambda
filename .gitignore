@@ -7,8 +7,8 @@ __pycache__/
 *.pyc
 *.pyo
 
-# 👇 Archivos de sistema
-.DS_Store
+# 👇 Archivos que no se deberia subir al github
+terraform.tfvars
 
 # 👇 Archivos de logs temporales
 *.log

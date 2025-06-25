@@ -1,6 +1,7 @@
 provider "aws" {
-  region = var.aws_region
+  region     = var.aws_region
 }
+
 
 # 🧩 Empaquetar Lambda automáticamente
 data "archive_file" "lambda_zip" {
@@ -52,7 +53,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Effect = "Allow",
         Action = ["s3:PutObject"],
         Resource = "arn:aws:s3:::${var.output_bucket_name}/*"
-      }
+      },
       {
         Effect = "Allow"
         Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Scan"]
@@ -60,7 +61,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
       }
     ]
   })
-  
+
   depends_on = [aws_dynamodb_table.reportes]
 }
 
