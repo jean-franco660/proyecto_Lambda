@@ -2,9 +2,6 @@ provider "aws" {
   region     = var.aws_region
 }
 
-variable "env" {}
-variable "input_bucket_name" {}
-variable "output_bucket_name" {}
 
 # 🧩 Empaquetar Lambda automáticamente
 data "archive_file" "lambda_zip" {
@@ -50,12 +47,12 @@ resource "aws_iam_role_policy" "lambda_policy" {
       {
         Effect = "Allow",
         Action = ["s3:GetObject"],
-        Resource = "${aws_s3_bucket.csv_input_bucket.arn}/*"
+        Resource = "arn:aws:s3:::${var.input_bucket_name}/*"
       },
       {
         Effect = "Allow",
         Action = ["s3:PutObject"],
-        Resource = "${aws_s3_bucket.report_output_bucket.arn}/*"
+        Resource = "arn:aws:s3:::${var.output_bucket_name}/*"
       },
       {
         Effect = "Allow",
@@ -98,7 +95,7 @@ resource "aws_lambda_permission" "allow_s3_invoke" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.my_lambda.function_name
   principal     = "s3.amazonaws.com"
-  source_arn    = aws_s3_bucket.csv_input_bucket.arn
+  source_arn = "arn:aws:s3:::${var.input_bucket_name}"
 }
 
 # 🔗 Configurar trigger de S3 → Lambda
