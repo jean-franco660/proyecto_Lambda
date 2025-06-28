@@ -12,6 +12,7 @@ __pycache__/
 *.tfstate
 *.tfstate.backup
 .terraform.lock.hcl
+function.zip
 
 # 👇 Archivos de logs temporales
 *.log
