@@ -15,7 +15,7 @@ data "archive_file" "lambda_zip" {
 
 # 🔐 Rol de ejecución para Lambda
 resource "aws_iam_role" "lambda_exec_role" {
-  name = "lambda_role_cloud"
+  name = "lambda_role_csv_to_reportes"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -32,7 +32,7 @@ resource "aws_iam_role" "lambda_exec_role" {
 
 # 📜 Políticas para permitir acceso a S3 y DynamoDB
 resource "aws_iam_role_policy" "lambda_policy" {
-  name = "lambda_s3_dynamodb_policy"
+  name = "lambda_s3_dynamodb_policy_csv_to_reportes"
   role = aws_iam_role.lambda_exec_role.id
 
   policy = jsonencode({
@@ -70,7 +70,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
 
 # 🧠 Función Lambda
 resource "aws_lambda_function" "my_lambda" {
-  function_name = "lambda_reportes"
+  function_name = "lambda_reportes_csv"
 
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "main.lambda_handler"
@@ -115,7 +115,7 @@ resource "aws_s3_bucket_notification" "s3_to_lambda" {
 
 # 🧾 Tabla DynamoDB
 resource "aws_dynamodb_table" "reportes" {
-  name         = "reportes"
+  name         = "reportes_csv"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "reporte_id"
 
