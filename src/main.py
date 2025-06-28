@@ -1,78 +1,66 @@
 import boto3
-import csv
-import json
 import os
+import json
+import csv
 import io
 import time
-import statistics
+
+# Inicializar cliente S3 y DynamoDB
+s3_client = boto3.client('s3')
+dynamodb = boto3.resource('dynamodb')
 
 def lambda_handler(event, context):
-    s3 = boto3.client("s3")
-    dynamodb = boto3.resource("dynamodb")
+    # 🔍 Extraer información del evento S3
+    input_bucket = event['Records'][0]['s3']['bucket']['name']
+    csv_key = event['Records'][0]['s3']['object']['key']
+    output_bucket = os.environ['REPORTS_BUCKET']
+    table_name = os.environ.get('DYNAMODB_TABLE', 'historial_reportes')
+    table = dynamodb.Table(table_name)  # type: ignore
 
-    # 📥 Extraer datos del evento
-    input_bucket = event["Records"][0]["s3"]["bucket"]["name"]
-    file_key = event["Records"][0]["s3"]["object"]["key"]
-    output_bucket = os.environ["OUTPUT_BUCKET_NAME"]
-    table = dynamodb.Table("historial_reportes") # type: ignore
+    print(f"📥 Procesando archivo {csv_key} desde {input_bucket}")
 
-    print(f"Procesando {file_key} desde {input_bucket}")
-
-    # 📄 Leer archivo CSV desde S3
+    # 📄 Leer CSV desde S3
     try:
-        response = s3.get_object(Bucket=input_bucket, Key=file_key)
-        contenido = response["Body"].read().decode("utf-8").splitlines()
-        filas = list(csv.DictReader(contenido))
+        response = s3_client.get_object(Bucket=input_bucket, Key=csv_key)
+        csv_lines = response['Body'].read().decode('utf-8').splitlines()
     except Exception as e:
-        print(f"❌ Error al leer CSV: {e}")
+        print(f"❌ Error al leer el archivo CSV: {e}")
         raise
 
-    # 🧹 Limpiar datos
-    datos_limpios = limpiar_datos(filas)
-    columnas = list(datos_limpios[0].keys()) if datos_limpios else []
-    total = len(datos_limpios)
-    ventas = [float(r["SALES"]) for r in datos_limpios if r.get("SALES")]
+    # 🧹 Procesar contenido
+    data = process_csv(csv_lines)
+    columnas = list(data[0].keys()) if data else []
+    filas_totales = len(data)
 
-    # 📊 Crear reporte JSON
-    reporte_json = {
-        "archivo": file_key,
-        "filas": total,
-        "columnas": columnas,
-        "estadisticas": {
-            "conteo": len(ventas),
-            "min": min(ventas) if ventas else 0,
-            "max": max(ventas) if ventas else 0,
-            "promedio": statistics.mean(ventas) if ventas else 0
-        }
-    }
+    # 📊 Crear reportes
+    json_report = generate_json_report(data)
+    html_report = generate_html_report(data)
 
-    json_key = f"reporte_{file_key.replace('.csv', '.json')}"
-    csv_key = f"limpio_{file_key}"
+    # 📁 Construir claves para los archivos
+    base_name = os.path.splitext(os.path.basename(csv_key))[0]
+    json_key = f"{base_name}_report.json"
+    html_key = f"{base_name}_report.html"
 
-    # 🚀 Subir JSON y CSV limpio
     try:
-        s3.put_object(
+        # 📤 Subir JSON
+        s3_client.put_object(
             Bucket=output_bucket,
             Key=json_key,
-            Body=json.dumps(reporte_json, indent=4).encode("utf-8"),
+            Body=json.dumps(json_report, indent=4).encode("utf-8"),
             ContentType="application/json"
         )
 
-        buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, fieldnames=columnas)
-        writer.writeheader()
-        writer.writerows(datos_limpios)
-
-        s3.put_object(
+        # 📤 Subir HTML
+        s3_client.put_object(
             Bucket=output_bucket,
-            Key=csv_key,
-            Body=buffer.getvalue().encode("utf-8"),
-            ContentType="text/csv"
+            Key=html_key,
+            Body=html_report.encode("utf-8"),
+            ContentType="text/html"
         )
 
-        print(f"✅ Archivos subidos: {json_key}, {csv_key}")
+        print(f"✅ Reportes subidos: {json_key}, {html_key}")
     except Exception as e:
-        print(f"❌ Error al subir archivos: {e}")
+        print(f"❌ Error al subir los reportes: {e}")
         raise
 
     # 🧾 Registrar en DynamoDB
@@ -80,55 +68,59 @@ def lambda_handler(event, context):
         table.put_item(
             Item={
                 "reporte_id": json_key,
-                "archivo": file_key,
+                "archivo_origen": csv_key,
                 "timestamp": int(time.time()),
-                "filas": total,
+                "filas": filas_totales,
                 "columnas": columnas,
-                "json_key": json_key,
-                "csv_key": csv_key
+                "json_report": json_key,
+                "html_report": html_key
             }
         )
-        print(f"📦 Reporte registrado en DynamoDB")
+        print("📦 Registro guardado en DynamoDB")
     except Exception as e:
         print(f"❌ Error al guardar en DynamoDB: {e}")
 
     return {
         "statusCode": 200,
-        "body": f"Procesado exitosamente: {json_key}"
+        "body": f"Reportes generados para {csv_key}"
     }
 
-# 🔍 Limpieza básica
-def limpiar_datos(rows):
-    datos = []
-    vistos = set()
+# 🧹 Limpieza básica del CSV
+def process_csv(csv_lines):
+    reader = csv.DictReader(csv_lines)
+    return list(reader)
 
-    for row in rows:
-        try:
-            if not row.get("QUANTITYORDERED") or int(row["QUANTITYORDERED"]) == 0:
-                continue
-            if float(row.get("PRICEEACH", 0)) < 0:
-                continue
-            if row.get("STATUS") == "DLEIVERED":
-                row["STATUS"] = "DELIVERED"
-            elif not row.get("STATUS"):
-                row["STATUS"] = "UNKNOWN"
-            time.strptime(row["ORDERDATE"], "%Y-%m-%d")
-            float(row["SALES"])
-            clave = (row["ORDERNUMBER"], row["ORDERLINENUMBER"])
-            if clave in vistos:
-                continue
-            vistos.add(clave)
-            row["PRODUCTCODE"] = row["PRODUCTCODE"][:15]
-            row["PRODUCTLINE"] = row["PRODUCTLINE"][:30]
-            if not row["ORDERNUMBER"].isdigit() or not row["ORDERLINENUMBER"].isdigit():
-                continue
-            if not row["NUMERICCODE"].isdigit():
-                continue
-            row["COUNTRY"] = ''.join(c for c in row["COUNTRY"] if c.isalpha() or c.isspace())
-            row["CITY"] = row.get("CITY") or "SIN CIUDAD"
+# 📊 Reporte JSON simple
+def generate_json_report(data):
+    if not data:
+        return {"mensaje": "Sin datos"}
+    
+    ventas = [float(r["SALES"]) for r in data if r.get("SALES") and is_number(r["SALES"])]
+    return {
+        "filas": len(data),
+        "columnas": list(data[0].keys()),
+        "ventas": {
+            "conteo": len(ventas),
+            "min": min(ventas) if ventas else 0,
+            "max": max(ventas) if ventas else 0,
+            "promedio": sum(ventas)/len(ventas) if ventas else 0
+        }
+    }
 
-            datos.append(row)
-        except:
-            continue
+# 🖼️ Reporte HTML simple
+def generate_html_report(data):
+    html = "<html><body><h2>Vista previa del CSV</h2><table border='1'>"
+    if data:
+        html += "<tr>" + "".join(f"<th>{k}</th>" for k in data[0].keys()) + "</tr>"
+        for row in data[:5]:
+            html += "<tr>" + "".join(f"<td>{v}</td>" for v in row.values()) + "</tr>"
+    html += "</table></body></html>"
+    return html
 
-    return datos
+# 🔢 Validación auxiliar
+def is_number(value):
+    try:
+        float(value)
+        return True
+    except:
+        return False

@@ -2,7 +2,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-# 🧩 Empaquetar el código Python
+# 🔹 Empaquetar código Lambda
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/src"
@@ -11,24 +11,23 @@ data "archive_file" "lambda_zip" {
 
 # 🔐 Rol de ejecución para Lambda
 resource "aws_iam_role" "lambda_exec_role" {
-  name = "lambda_role_cloud"
+  name = "lambda_execution_role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
-      Action = "sts:AssumeRole",
+      Effect = "Allow",
       Principal = {
         Service = "lambda.amazonaws.com"
       },
-      Effect = "Allow",
-      Sid    = ""
+      Action = "sts:AssumeRole"
     }]
   })
 }
 
-# 📜 Políticas para permitir acceso a S3 y DynamoDB
+# 📜 Políticas de acceso
 resource "aws_iam_role_policy" "lambda_policy" {
-  name = "lambda_s3_dynamodb_policy"
+  name = "lambda_policy"
   role = aws_iam_role.lambda_exec_role.id
 
   policy = jsonencode({
@@ -37,50 +36,47 @@ resource "aws_iam_role_policy" "lambda_policy" {
       {
         Effect = "Allow",
         Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
+          "logs:*"
         ],
         Resource = "*"
       },
       {
         Effect = "Allow",
-        Action = ["s3:GetObject"],
-        Resource = "arn:aws:s3:::${var.input_bucket_name}/*"
-      },
-      {
-        Effect = "Allow",
-        Action = ["s3:PutObject"],
-        Resource = "arn:aws:s3:::${var.output_bucket_name}/*"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject"
+        ],
+        Resource = [
+          "arn:aws:s3:::${var.input_bucket_name}/*",
+          "arn:aws:s3:::${var.output_bucket_name}/*"
+        ]
       },
       {
         Effect = "Allow",
         Action = [
           "dynamodb:PutItem"
         ],
-        Resource = aws_dynamodb_table.reportes.arn
+        Resource = "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${var.dynamodb_table}"
       }
     ]
   })
-
-  depends_on = [aws_dynamodb_table.reportes]
 }
 
+data "aws_caller_identity" "current" {}
 
-# 🧠 Función Lambda
-resource "aws_lambda_function" "my_lambda" {
-  function_name = "lambda_reportes"
-
+# 🔁 Función Lambda
+resource "aws_lambda_function" "procesador_csv" {
+  function_name = "procesador_csv_lambda"
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "main.lambda_handler"
   runtime       = "python3.11"
-
-  filename         = data.archive_file.lambda_zip.output_path
+  filename      = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   environment {
     variables = {
-      OUTPUT_BUCKET_NAME = var.output_bucket_name
+      REPORTS_BUCKET   = var.output_bucket_name
+      DYNAMODB_TABLE   = var.dynamodb_table
     }
   }
 
@@ -90,39 +86,23 @@ resource "aws_lambda_function" "my_lambda" {
   }
 }
 
-# 🔔 Permiso para invocación desde S3
-resource "aws_lambda_permission" "allow_s3_invoke" {
+# 🔔 Permitir que S3 invoque Lambda
+resource "aws_lambda_permission" "allow_s3" {
   statement_id  = "AllowExecutionFromS3"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.my_lambda.function_name
+  function_name = aws_lambda_function.procesador_csv.function_name
   principal     = "s3.amazonaws.com"
   source_arn    = "arn:aws:s3:::${var.input_bucket_name}"
 }
 
-# 📩 Notificación desde S3 al cargar archivo
-resource "aws_s3_bucket_notification" "s3_to_lambda" {
+# 📨 Notificación desde S3 al subir archivo
+resource "aws_s3_bucket_notification" "csv_upload_trigger" {
   bucket = var.input_bucket_name
 
   lambda_function {
-    lambda_function_arn = aws_lambda_function.my_lambda.arn
+    lambda_function_arn = aws_lambda_function.procesador_csv.arn
     events              = ["s3:ObjectCreated:*"]
   }
 
-  depends_on = [aws_lambda_permission.allow_s3_invoke]
+  depends_on = [aws_lambda_permission.allow_s3]
 }
-
-resource "aws_dynamodb_table" "reportes" {
-  name         = "reportes"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "reporte_id"
-
-  attribute {
-    name = "reporte_id"
-    type = "S"
-  }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
