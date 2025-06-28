@@ -106,7 +106,7 @@ resource "aws_s3_bucket_notification" "s3_to_lambda" {
     events              = ["s3:ObjectCreated:*"]
   }
 
-  depends_on = [aws_lambda_permission.allow_s3_invoke]
+  depends_on = [module.s3]
 }
 
 # 🧾 Tabla DynamoDB
