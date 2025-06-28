@@ -6,75 +6,41 @@ terraform {
   }
 }
 
-# 🧩 Empaquetar el código Python
+# 📦 Empaquetar el código Lambda desde la carpeta `src/`
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/src"
   output_path = "${path.module}/function.zip"
 }
 
-# 🔐 Rol de ejecución para Lambda
-resource "aws_iam_role" "lambda_exec_role" {
-  name = "lambda_role_csv_to_reportes"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Action = "sts:AssumeRole",
-      Principal = {
-        Service = "lambda.amazonaws.com"
-      },
-      Effect = "Allow",
-      Sid    = ""
-    }]
-  })
+# 🔐 Usar un rol IAM existente con permisos adecuados
+data "aws_iam_role" "lambda_existing_role" {
+  name = "lambda_role_csv_to_reportes"  # Cambia si tu rol tiene otro nombre
 }
 
-# 📜 Políticas para permitir acceso a S3 y DynamoDB
-resource "aws_iam_role_policy" "lambda_policy" {
-  name = "lambda_s3_dynamodb_policy_csv_to_reportes"
-  role = aws_iam_role.lambda_exec_role.id
+# 🧾 Crear tabla DynamoDB para guardar metadatos de reportes
+resource "aws_dynamodb_table" "reportes" {
+  name         = "reportes_csv"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "reporte_id"
 
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        Resource = "*"
-      },
-      {
-        Effect = "Allow",
-        Action = ["s3:GetObject"],
-        Resource = "arn:aws:s3:::${var.input_bucket_name}/*"
-      },
-      {
-        Effect = "Allow",
-        Action = ["s3:PutObject"],
-        Resource = "arn:aws:s3:::${var.output_bucket_name}/*"
-      },
-      {
-        Effect = "Allow",
-        Action = ["dynamodb:PutItem"],
-        Resource = aws_dynamodb_table.reportes.arn
-      }
-    ]
-  })
+  attribute {
+    name = "reporte_id"
+    type = "S"
+  }
 
-  depends_on = [aws_dynamodb_table.reportes]
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
-# 🧠 Función Lambda
+# 🧠 Crear función Lambda
 resource "aws_lambda_function" "my_lambda" {
   function_name = "lambda_reportes_csv"
 
-  role          = aws_iam_role.lambda_exec_role.arn
-  handler       = "main.lambda_handler"
-  runtime       = "python3.11"
+  role    = data.aws_iam_role.lambda_existing_role.arn
+  handler = "main.lambda_handler"
+  runtime = "python3.11"
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
@@ -92,7 +58,7 @@ resource "aws_lambda_function" "my_lambda" {
   }
 }
 
-# 🔔 Permiso para invocación desde S3
+# 🔔 Permitir que S3 invoque Lambda
 resource "aws_lambda_permission" "allow_s3_invoke" {
   statement_id  = "AllowExecutionFromS3"
   action        = "lambda:InvokeFunction"
@@ -101,30 +67,16 @@ resource "aws_lambda_permission" "allow_s3_invoke" {
   source_arn    = "arn:aws:s3:::${var.input_bucket_name}"
 }
 
+# 🔄 Configurar notificación desde S3 para disparar Lambda
 resource "aws_s3_bucket_notification" "s3_to_lambda" {
   bucket = var.input_bucket_name
 
   lambda_function {
     lambda_function_arn = aws_lambda_function.my_lambda.arn
     events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "subidas/"
+    filter_suffix       = ".csv"
   }
 
   depends_on = [aws_lambda_permission.allow_s3_invoke]
-}
-
-
-# 🧾 Tabla DynamoDB
-resource "aws_dynamodb_table" "reportes" {
-  name         = "reportes_csv"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "reporte_id"
-
-  attribute {
-    name = "reporte_id"
-    type = "S"
-  }
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
