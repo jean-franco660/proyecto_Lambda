@@ -97,7 +97,6 @@ resource "aws_lambda_permission" "allow_s3_invoke" {
   source_arn    = "arn:aws:s3:::${var.input_bucket_name}"
 }
 
-# 📩 Notificación desde S3 al cargar archivo
 resource "aws_s3_bucket_notification" "s3_to_lambda" {
   bucket = var.input_bucket_name
 
@@ -106,8 +105,9 @@ resource "aws_s3_bucket_notification" "s3_to_lambda" {
     events              = ["s3:ObjectCreated:*"]
   }
 
-  depends_on = [module.s3]
+  depends_on = [aws_lambda_permission.allow_s3_invoke]
 }
+
 
 # 🧾 Tabla DynamoDB
 resource "aws_dynamodb_table" "reportes" {
