@@ -55,9 +55,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
       },
       {
         Effect = "Allow",
-        Action = [
-          "dynamodb:PutItem"
-        ],
+        Action = ["dynamodb:PutItem"],
         Resource = aws_dynamodb_table.reportes.arn
       }
     ]
@@ -65,7 +63,6 @@ resource "aws_iam_role_policy" "lambda_policy" {
 
   depends_on = [aws_dynamodb_table.reportes]
 }
-
 
 # 🧠 Función Lambda
 resource "aws_lambda_function" "my_lambda" {
@@ -81,6 +78,7 @@ resource "aws_lambda_function" "my_lambda" {
   environment {
     variables = {
       OUTPUT_BUCKET_NAME = var.output_bucket_name
+      DYNAMODB_TABLE     = aws_dynamodb_table.reportes.name
     }
   }
 
@@ -111,6 +109,7 @@ resource "aws_s3_bucket_notification" "s3_to_lambda" {
   depends_on = [aws_lambda_permission.allow_s3_invoke]
 }
 
+# 🧾 Tabla DynamoDB
 resource "aws_dynamodb_table" "reportes" {
   name         = "reportes"
   billing_mode = "PAY_PER_REQUEST"
@@ -125,4 +124,3 @@ resource "aws_dynamodb_table" "reportes" {
     prevent_destroy = true
   }
 }
-
