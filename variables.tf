@@ -13,9 +13,3 @@ variable "output_bucket_name" {
   description = "Nombre del bucket de salida para reportes"
   type        = string
 }
-
-variable "dynamodb_table" {
-  description = "Nombre de la tabla DynamoDB usada por Lambda"
-  type        = string
-}
-
