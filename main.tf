@@ -2,14 +2,14 @@ provider "aws" {
   region = var.aws_region
 }
 
-# 🧩 Empaquetar código
+# 🧩 Empaquetar el código Python
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/src"
   output_path = "${path.module}/function.zip"
 }
 
-# 🔐 Rol de ejecución
+# 🔐 Rol de ejecución para Lambda
 resource "aws_iam_role" "lambda_exec_role" {
   name = "lambda_role_cloud"
 
@@ -26,9 +26,9 @@ resource "aws_iam_role" "lambda_exec_role" {
   })
 }
 
-# 📜 Políticas IAM
+# 📜 Políticas para permitir acceso a S3 y DynamoDB
 resource "aws_iam_role_policy" "lambda_policy" {
-  name = "lambda_s3_politicas"
+  name = "lambda_s3_dynamodb_policy"
   role = aws_iam_role.lambda_exec_role.id
 
   policy = jsonencode({
@@ -55,7 +55,9 @@ resource "aws_iam_role_policy" "lambda_policy" {
       },
       {
         Effect = "Allow",
-        Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Scan"],
+        Action = [
+          "dynamodb:PutItem"
+        ],
         Resource = aws_dynamodb_table.reportes.arn
       }
     ]
@@ -64,14 +66,14 @@ resource "aws_iam_role_policy" "lambda_policy" {
   depends_on = [aws_dynamodb_table.reportes]
 }
 
+
 # 🧠 Función Lambda
 resource "aws_lambda_function" "my_lambda" {
   function_name = "lambda_reportes"
-  
-  description   = "Procesa CSV y genera reporte JSON"
+
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "main.lambda_handler"
-  runtime       = "python3.13"
+  runtime       = "python3.11"
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
@@ -88,7 +90,7 @@ resource "aws_lambda_function" "my_lambda" {
   }
 }
 
-# 🔔 Permiso de invocación desde S3
+# 🔔 Permiso para invocación desde S3
 resource "aws_lambda_permission" "allow_s3_invoke" {
   statement_id  = "AllowExecutionFromS3"
   action        = "lambda:InvokeFunction"
@@ -97,7 +99,7 @@ resource "aws_lambda_permission" "allow_s3_invoke" {
   source_arn    = "arn:aws:s3:::${var.input_bucket_name}"
 }
 
-# 🔔 Notificación desde S3
+# 📩 Notificación desde S3 al cargar archivo
 resource "aws_s3_bucket_notification" "s3_to_lambda" {
   bucket = var.input_bucket_name
 
@@ -109,9 +111,8 @@ resource "aws_s3_bucket_notification" "s3_to_lambda" {
   depends_on = [aws_lambda_permission.allow_s3_invoke]
 }
 
-# 🧾 Tabla DynamoDB
 resource "aws_dynamodb_table" "reportes" {
-  name         = "Reportes"
+  name         = "reportes"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "reporte_id"
 
@@ -124,3 +125,4 @@ resource "aws_dynamodb_table" "reportes" {
     prevent_destroy = true
   }
 }
+
