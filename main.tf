@@ -43,7 +43,7 @@ resource "aws_lambda_function" "my_lambda" {
   runtime = "python3.11"
 
   filename         = "${path.module}/function.zip"
-  source_code_hash = filebase64sha256("${path.module}/function.zip")
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   environment {
     variables = {
