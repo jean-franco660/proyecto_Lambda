@@ -15,7 +15,7 @@ data "archive_file" "lambda_zip" {
 
 # 🔐 Usar un rol IAM existente con permisos adecuados
 data "aws_iam_role" "lambda_existing_role" {
-  name = "lambda_role_csv_to_reportes"  # Cambia si tu rol tiene otro nombre
+  name = "lambda_role_csv_to_reportes" 
 }
 
 # 🧾 Crear tabla DynamoDB para guardar metadatos de reportes
@@ -74,7 +74,7 @@ resource "aws_s3_bucket_notification" "s3_to_lambda" {
   lambda_function {
     lambda_function_arn = aws_lambda_function.my_lambda.arn
     events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "subidas/"
+    filter_prefix       = "src/"
     filter_suffix       = ".csv"
   }
 
