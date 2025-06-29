@@ -47,19 +47,26 @@ def lambda_handler(event, context):
 
         for col in columnas:
             try:
-                valores = [
-                    float(f[col]) for f in filas
-                    if f.get(col) is not None and f[col].strip() != ""
-                    ]
+                valores = []
+                for f in filas:
+                    valor = f.get(col)
+                    if valor is not None and valor.strip() != "":
+                        try:
+                            valores.append(float(valor))
+                        except ValueError:
+                            continue
+
                 if valores:
                     resumen["columnas_numericas"].append(col)
                     resumen["estadisticas"][col] = {
                         "media": statistics.mean(valores),
                         "desviacion_estandar": statistics.stdev(valores) if len(valores) > 1 else 0.0,
-                        "nulos": sum(1 for f in filas if f[col].strip() == "")
+                        "nulos": sum(1 for f in filas if f.get(col) is None or f[col].strip() == "")
                     }
-            except ValueError:
+            except Exception as e:
+                print(f"⚠️ Error en columna {col}: {str(e)}")
                 continue
+
 
         # 📝 Guardar reporte JSON en bucket de salida
         key_output = f"reportes/{filename.replace('.csv', '.json')}"
