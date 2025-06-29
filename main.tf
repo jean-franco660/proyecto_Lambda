@@ -7,10 +7,6 @@ terraform {
   }
 }
 
-provider "aws" {
-  region = var.aws_region
-}
-
 # 📦 Empaquetar código Lambda desde ./src
 data "archive_file" "lambda_zip" {
   type        = "zip"
