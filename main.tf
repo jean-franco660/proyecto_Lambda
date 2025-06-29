@@ -48,7 +48,6 @@ resource "aws_lambda_function" "process_csv" {
   lifecycle {
     ignore_changes = [
       source_code_hash,
-      last_modified
     ]
   }
 }
