@@ -1,31 +1,36 @@
 terraform {
   required_providers {
     aws = {
-      source = "hashicorp/aws"
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
     }
   }
 }
 
-# 📦 Empaquetar el código Lambda desde la carpeta `src/`
+provider "aws" {
+  region = var.aws_region
+}
+
+# 📦 Empaquetar código Lambda desde ./src
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/src"
   output_path = "${path.module}/function.zip"
 }
 
-# 🔐 Usar un rol IAM existente con permisos adecuados
+# 🔐 Rol IAM existente con permisos adecuados
 data "aws_iam_role" "lambda_existing_role" {
-  name = "lambda_role_csv_to_reportes" 
+  name = "lambda_role_csv_to_reportes"
 }
 
-# 🧾 Crear tabla DynamoDB para guardar metadatos de reportes
+# 🧾 Crear tabla DynamoDB para registrar reportes
 resource "aws_dynamodb_table" "reportes" {
   name         = "reportes_csv"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "reporte_id"
+  hash_key     = "id"
 
   attribute {
-    name = "reporte_id"
+    name = "id"
     type = "S"
   }
 
@@ -34,7 +39,7 @@ resource "aws_dynamodb_table" "reportes" {
   }
 }
 
-# 🧠 Crear función Lambda
+# 🧠 Función Lambda
 resource "aws_lambda_function" "my_lambda" {
   function_name = "lambda_reportes_csv"
 
@@ -58,7 +63,6 @@ resource "aws_lambda_function" "my_lambda" {
   }
 }
 
-
 # 🔔 Permitir que S3 invoque Lambda
 resource "aws_lambda_permission" "allow_s3_invoke" {
   statement_id  = "AllowExecutionFromS3"
@@ -68,7 +72,7 @@ resource "aws_lambda_permission" "allow_s3_invoke" {
   source_arn    = "arn:aws:s3:::${var.input_bucket_name}"
 }
 
-# 🔄 Configurar notificación desde S3 para disparar Lambda
+# 🔄 Configurar evento S3 para activar Lambda
 resource "aws_s3_bucket_notification" "s3_to_lambda" {
   bucket = var.input_bucket_name
 

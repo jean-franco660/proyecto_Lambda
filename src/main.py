@@ -7,12 +7,14 @@ import statistics
 
 def lambda_handler(event, context):
     s3 = boto3.client('s3')
+    dynamodb = boto3.resource('dynamodb')
 
     # 📥 Datos del evento de S3
     bucket_input = event['Records'][0]['s3']['bucket']['name']
     key_input = event['Records'][0]['s3']['object']['key']
 
     bucket_output = os.environ['OUTPUT_BUCKET_NAME']
+    dynamodb_table = os.environ['DYNAMODB_TABLE']
 
     try:
         # 📄 Leer CSV desde S3
@@ -31,7 +33,7 @@ def lambda_handler(event, context):
             "estadisticas": {}
         }
 
-        for col in columnas: # type: ignore
+        for col in columnas:  # type: ignore
             try:
                 valores = [float(f[col]) for f in filas if f[col].strip() != ""]
                 if valores:
@@ -42,7 +44,6 @@ def lambda_handler(event, context):
                         "nulos": sum(1 for f in filas if f[col].strip() == "")
                     }
             except ValueError:
-                # No es columna numérica
                 continue
 
         # 📝 Guardar reporte JSON en S3
@@ -51,6 +52,21 @@ def lambda_handler(event, context):
         key_json = key_input.replace('.csv', '.json')
         s3.upload_fileobj(json_buffer, bucket_output, f"reportes/{key_json}")
         print(f"✅ Reporte subido: reportes/{key_json}")
+
+        # 🗃️ Guardar resumen en DynamoDB
+        table = dynamodb.Table(dynamodb_table) # type: ignore
+
+        # Clave primaria: nombre del archivo
+        item = {
+            "id": key_json,
+            "total_filas": resumen["total_filas"],
+            "columnas": resumen["columnas"],
+            "columnas_numericas": resumen["columnas_numericas"],
+            "estadisticas": resumen["estadisticas"]
+        }
+
+        table.put_item(Item=item)
+        print(f"✅ Reporte insertado en DynamoDB: {key_json}")
 
         return {"status": "ok", "archivo": key_input}
 
