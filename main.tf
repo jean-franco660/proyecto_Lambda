@@ -42,8 +42,8 @@ resource "aws_lambda_function" "my_lambda" {
   handler = "main.lambda_handler"
   runtime = "python3.11"
 
-  filename         = data.archive_file.lambda_zip.output_path
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  filename         = "${path.module}/function.zip"
+  source_code_hash = filebase64sha256("${path.module}/function.zip")
 
   environment {
     variables = {
@@ -57,6 +57,7 @@ resource "aws_lambda_function" "my_lambda" {
     ignore_changes  = [filename, source_code_hash]
   }
 }
+
 
 # 🔔 Permitir que S3 invoque Lambda
 resource "aws_lambda_permission" "allow_s3_invoke" {
