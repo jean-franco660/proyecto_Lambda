@@ -1,39 +1,49 @@
 import json
 import boto3
-import pandas as pd
+import csv
 import io
 import os
+import statistics
 
 def lambda_handler(event, context):
     s3 = boto3.client('s3')
-    
+
     # 📥 Datos del evento de S3
     bucket_input = event['Records'][0]['s3']['bucket']['name']
     key_input = event['Records'][0]['s3']['object']['key']
-    
+
     bucket_output = os.environ['OUTPUT_BUCKET_NAME']
-    
+
     try:
         # 📄 Leer CSV desde S3
         obj = s3.get_object(Bucket=bucket_input, Key=key_input)
-        df = pd.read_csv(obj['Body'])
-        
-        # 📊 Generar resumen
+        contenido = obj['Body'].read().decode('utf-8')
+        reader = csv.DictReader(io.StringIO(contenido))
+
+        filas = list(reader)
+        columnas = reader.fieldnames
+
         resumen = {
             "archivo": key_input,
-            "total_filas": len(df),
-            "columnas": list(df.columns),
+            "total_filas": len(filas),
+            "columnas": columnas,
             "columnas_numericas": [],
             "estadisticas": {}
         }
 
-        for col in df.select_dtypes(include='number').columns:
-            resumen["columnas_numericas"].append(col)
-            resumen["estadisticas"][col] = {
-                "media": df[col].mean(),
-                "desviacion_estandar": df[col].std(),
-                "nulos": int(df[col].isnull().sum())
-            }
+        for col in columnas:
+            try:
+                valores = [float(f[col]) for f in filas if f[col].strip() != ""]
+                if valores:
+                    resumen["columnas_numericas"].append(col)
+                    resumen["estadisticas"][col] = {
+                        "media": statistics.mean(valores),
+                        "desviacion_estandar": statistics.stdev(valores) if len(valores) > 1 else 0.0,
+                        "nulos": sum(1 for f in filas if f[col].strip() == "")
+                    }
+            except ValueError:
+                # No es columna numérica
+                continue
 
         # 📝 Guardar reporte JSON en S3
         json_bytes = json.dumps(resumen, indent=2).encode('utf-8')
