@@ -2,10 +2,11 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = ">= 3.0.0"
     }
   }
 }
+
 
 # 📦 Empaquetar código Lambda desde ./src
 data "archive_file" "lambda_zip" {
