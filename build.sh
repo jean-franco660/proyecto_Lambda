@@ -1,26 +1,26 @@
 #!/bin/bash
 set -e
 
-echo "🛠️ Construyendo paquete Lambda..."
+echo "🛠️ Construyendo paquete Lambda desde ./src"
 
-# 1. Elimina el ZIP anterior
+# Elimina ZIP anterior si existe
 rm -f function.zip
 
-# 2. Crea carpeta temporal para el build
+# Crea carpeta de build temporal
 mkdir -p build
 
-# 3. Instala dependencias en build/
-pip install -r requirements.txt -t build/
+# Instala dependencias en la carpeta build/
+pip install -r src/requirements.txt -t build/
 
-# 4. Copia el código fuente (main.py) a build/
-cp main.py build/
+# Copia tu código fuente (main.py) a build/
+cp src/main.py build/
 
-# 5. Comprimir el contenido de build/ en function.zip
+# Comprimir todo en function.zip
 cd build
 zip -r ../function.zip .
 cd ..
 
-# 6. Limpieza opcional
+# Limpieza
 rm -rf build
 
 echo "✅ Paquete Lambda creado: function.zip"
