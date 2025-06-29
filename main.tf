@@ -1,50 +1,41 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = ">= 3.0.0"
-    }
-  }
-}
-
-
-# 📦 Empaquetar código Lambda desde ./src
+# ✅ Empaquetar el código desde /src/
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/src"
-  output_path = "${path.module}/function.zip"
+  output_path = "${path.module}/lambda_package.zip"
 }
 
-# 🔐 Rol IAM existente con permisos adecuados
-data "aws_iam_role" "lambda_existing_role" {
-  name = "lambda_role_csv_to_reportes"
+# ✅ Rol IAM ya existente en AWS (¡este es el cambio principal!)
+data "aws_iam_role" "lambda_role" {
+  name = "lambda_role_csv_to_reportes"  # Cambia si tu rol tiene otro nombre real
 }
 
-# 🧾 Crear tabla DynamoDB para registrar reportes
+# ✅ Crear tabla DynamoDB para registrar reportes
 resource "aws_dynamodb_table" "reportes" {
   name         = "reportes_csv"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "id"
+  hash_key     = "report_id"
 
   attribute {
-    name = "id"
+    name = "report_id"
     type = "S"
   }
 
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = false
   }
 }
 
-# 🧠 Función Lambda
-resource "aws_lambda_function" "my_lambda" {
+# ✅ Función Lambda
+resource "aws_lambda_function" "process_csv" {
   function_name = "lambda_reportes_csv"
+  role          = data.aws_iam_role.lambda_role.arn
+  handler       = "main.lambda_handler"
+  runtime       = "python3.12"
+  memory_size   = 512
+  timeout       = 60
 
-  role    = data.aws_iam_role.lambda_existing_role.arn
-  handler = "main.lambda_handler"
-  runtime = "python3.11"
-
-  filename         = "${path.module}/function.zip"
+  filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   environment {
@@ -55,30 +46,9 @@ resource "aws_lambda_function" "my_lambda" {
   }
 
   lifecycle {
-    prevent_destroy = true
-    ignore_changes  = [filename, source_code_hash]
+    ignore_changes = [
+      source_code_hash,
+      last_modified
+    ]
   }
-}
-
-# 🔔 Permitir que S3 invoque Lambda
-resource "aws_lambda_permission" "allow_s3_invoke" {
-  statement_id  = "AllowExecutionFromS3"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.my_lambda.function_name
-  principal     = "s3.amazonaws.com"
-  source_arn    = "arn:aws:s3:::${var.input_bucket_name}"
-}
-
-# 🔄 Configurar evento S3 para activar Lambda
-resource "aws_s3_bucket_notification" "s3_to_lambda" {
-  bucket = var.input_bucket_name
-
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.my_lambda.arn
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "archivos/"
-    filter_suffix       = ".csv"
-  }
-
-  depends_on = [aws_lambda_permission.allow_s3_invoke]
 }
