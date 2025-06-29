@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🛠️ Construyendo paquete Lambda desde ./src"
+echo "🛠️ Construyendo paquete Lambda sin dependencias externas"
 
 # Elimina ZIP anterior si existe
 rm -f function.zip
@@ -9,13 +9,10 @@ rm -f function.zip
 # Crea carpeta de build temporal
 mkdir -p build
 
-# Instala dependencias en la carpeta build/
-pip install -r src/requirements.txt -t build/
-
-# Copia tu código fuente (main.py) a build/
+# Solo copiar tu archivo main.py
 cp src/main.py build/
 
-# Comprimir todo en function.zip
+# Comprimir en ZIP
 cd build
 zip -r ../function.zip .
 cd ..

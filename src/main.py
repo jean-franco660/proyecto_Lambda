@@ -31,7 +31,7 @@ def lambda_handler(event, context):
             "estadisticas": {}
         }
 
-        for col in columnas:
+        for col in columnas: # type: ignore
             try:
                 valores = [float(f[col]) for f in filas if f[col].strip() != ""]
                 if valores:
