@@ -47,7 +47,10 @@ def lambda_handler(event, context):
 
         for col in columnas:
             try:
-                valores = [float(f[col]) for f in filas if f[col].strip() != ""]
+                valores = [
+                    float(f[col]) for f in filas
+                    if f.get(col) is not None and f[col].strip() != ""
+                    ]
                 if valores:
                     resumen["columnas_numericas"].append(col)
                     resumen["estadisticas"][col] = {
