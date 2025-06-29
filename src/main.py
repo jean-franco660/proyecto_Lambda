@@ -1,7 +1,6 @@
 import json
 import boto3
 import pandas as pd
-import matplotlib.pyplot as plt
 import io
 import os
 
@@ -36,24 +35,7 @@ def lambda_handler(event, context):
                 "nulos": int(df[col].isnull().sum())
             }
 
-        # 📈 Histograma (columna numérica 1°)
-        if resumen["columnas_numericas"]:
-            col = resumen["columnas_numericas"][0]
-            plt.figure()
-            df[col].hist(bins=20)
-            plt.title(f'Distribución de {col}')
-            plt.xlabel(col)
-            plt.ylabel('Frecuencia')
-
-            img_buffer = io.BytesIO()
-            plt.savefig(img_buffer, format='png')
-            img_buffer.seek(0)
-
-            key_png = key_input.replace('.csv', '.png')
-            s3.upload_fileobj(img_buffer, bucket_output, f"reportes/{key_png}")
-            print(f"✅ Imagen subida: reportes/{key_png}")
-
-        # 📝 Guardar reporte JSON
+        # 📝 Guardar reporte JSON en S3
         json_bytes = json.dumps(resumen, indent=2).encode('utf-8')
         json_buffer = io.BytesIO(json_bytes)
         key_json = key_input.replace('.csv', '.json')
