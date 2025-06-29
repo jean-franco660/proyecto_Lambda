@@ -1,11 +1,11 @@
 output "lambda_function_name" {
   description = "Nombre de la función Lambda"
-  value       = aws_lambda_function.my_lambda.function_name
+  value       = aws_lambda_function.process_csv.function_name
 }
 
 output "lambda_function_arn" {
   description = "ARN de la función Lambda"
-  value       = aws_lambda_function.my_lambda.arn
+  value       = aws_lambda_function.process_csv.arn
 }
 
 output "dynamodb_table_name" {
