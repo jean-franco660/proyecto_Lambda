@@ -26,7 +26,7 @@ resource "aws_dynamodb_table" "reportes" {
   }
 }
 
-# ✅ Función Lambda
+# ✅ Función Lambda (Versión simplificada para depuración)
 resource "aws_lambda_function" "process_csv" {
   function_name = "lambda_reportes_csv"
   role          = data.aws_iam_role.lambda_role.arn
@@ -43,11 +43,5 @@ resource "aws_lambda_function" "process_csv" {
       OUTPUT_BUCKET_NAME = var.output_bucket_name
       DYNAMODB_TABLE     = aws_dynamodb_table.reportes.name
     }
-  }
-
-  lifecycle {
-    ignore_changes = [
-      source_code_hash,
-    ]
   }
 }
